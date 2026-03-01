@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // 🔥 Nueva para persistencia
+import 'package:shared_preferences/shared_preferences.dart';
 
 // --- VARIABLES GLOBALES ---
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
@@ -53,10 +53,10 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPersistedSession(); // 🔥 Revisar sesión al abrir
+    _checkPersistedSession(); 
   }
 
-  // 🔥 FUNCIÓN PARA RECUPERAR SESIÓN GUARDADA
+  // RECUPERAR SESIÓN
   _checkPersistedSession() async {
     final prefs = await SharedPreferences.getInstance();
     final bool? isAdminSaved = prefs.getBool('isAdmin');
@@ -65,14 +65,13 @@ class _MainScreenState extends State<MainScreen> {
     if (isAdminSaved == true) {
       setState(() => _isAdmin = true);
     } else if (userEmail != null) {
-      // Intenta reconectar al usuario de Google silenciosamente
       final GoogleSignIn googleSignIn = GoogleSignIn();
       final user = await googleSignIn.signInSilently();
       setState(() => _currentUser = user);
     }
   }
 
-  // 🔥 FUNCIÓN PARA CERRAR SESIÓN Y LIMPIAR DISCO
+  // CERRAR SESIÓN
   _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -91,7 +90,7 @@ class _MainScreenState extends State<MainScreen> {
       ProfileScreen(
         user: _currentUser, 
         isAdmin: _isAdmin,
-        onLogout: _logout, // 🔥 Pasamos la función de cierre
+        onLogout: _logout,
         onLogin: (user, isAdmin) async {
           final prefs = await SharedPreferences.getInstance();
           if (isAdmin) {
@@ -150,11 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(title: const Text('Aling Mayorista')),
       body: loading 
         ? const Center(child: CircularProgressIndicator()) 
-        : RefreshIndicator( // 🔥 CAMBIO: Pull-to-refresh agregado
+        : RefreshIndicator( 
             onRefresh: load,
             color: Colors.deepOrange,
             child: GridView.builder(
-              physics: const AlwaysScrollableScrollPhysics(), // Importante para que deslice siempre
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(12),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2, childAspectRatio: 0.72, mainAxisSpacing: 12, crossAxisSpacing: 12
@@ -173,8 +172,11 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mainState = context.findAncestorStateOfType<_MainScreenState>();
+    final bool isLoggedIn = (mainState?._currentUser != null) || (mainState?._isAdmin == true);
+
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ProductDetailScreen(product: product))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ProductDetailScreen(product: product, isLoggedIn: isLoggedIn))),
       child: Card(
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -199,10 +201,11 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
-// --- DETALLE DE PRODUCTO ---
+// --- DETALLE DE PRODUCTO (CON BLOQUEO DE BOTÓN) ---
 class ProductDetailScreen extends StatelessWidget {
   final dynamic product;
-  const ProductDetailScreen({super.key, required this.product});
+  final bool isLoggedIn;
+  const ProductDetailScreen({super.key, required this.product, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -225,12 +228,20 @@ class ProductDetailScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity, height: 50,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isLoggedIn ? Colors.deepOrange : Colors.grey, 
+                  foregroundColor: Colors.white
+                ),
                 onPressed: () {
+                  if (!isLoggedIn) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Inicia sesión en Perfil para poder comprar')));
+                    return; 
+                  }
                   cartNotifier.value = List.from(cartNotifier.value)..add(product);
                   Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Agregado al carrito')));
                 },
-                child: const Text('Añadir al Carrito'),
+                child: Text(isLoggedIn ? 'Añadir al Carrito' : 'Inicia sesión para añadir'),
               ),
             )
           ]),
@@ -240,11 +251,41 @@ class ProductDetailScreen extends StatelessWidget {
   }
 }
 
-// --- CARRITO ---
+// --- CARRITO (CON PANTALLA DE BLOQUEO) ---
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
+    final mainState = context.findAncestorStateOfType<_MainScreenState>();
+    final bool isLoggedIn = (mainState?._currentUser != null) || (mainState?._isAdmin == true);
+
+    if (!isLoggedIn) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Mi Carrito')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.remove_shopping_cart_outlined, size: 80, color: Colors.grey),
+              const SizedBox(height: 20),
+              const Text('Tu carrito está bloqueado', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              const Text('Debes iniciar sesión para comprar.', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+                onPressed: () {
+                  mainState?.setState(() => mainState._selectedIndex = 2);
+                },
+                child: const Text('Ir a Iniciar Sesión')
+              )
+            ],
+          ),
+        ),
+      );
+    }
+
     return ValueListenableBuilder<List>(
       valueListenable: cartNotifier,
       builder: (ctx, list, _) {
@@ -267,13 +308,8 @@ class CartScreen extends StatelessWidget {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
                 onPressed: () {
-                  final mainState = context.findAncestorStateOfType<_MainScreenState>();
-                  if (mainState?._currentUser == null && mainState?._isAdmin == false) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Inicia sesión en Perfil primero')));
-                  } else {
-                    String email = mainState?._isAdmin == true ? 'admin@aling.com' : mainState!._currentUser!.email;
-                    Navigator.push(context, MaterialPageRoute(builder: (c) => CheckoutScreen(total: total, email: email)));
-                  }
+                  String email = mainState?._isAdmin == true ? 'admin@aling.com' : mainState!._currentUser!.email;
+                  Navigator.push(context, MaterialPageRoute(builder: (c) => CheckoutScreen(total: total, email: email)));
                 }, 
                 child: const Text('Proceder al Pago')
               )
@@ -285,11 +321,11 @@ class CartScreen extends StatelessWidget {
   }
 }
 
-// --- PERFIL (MEJORADO CON SELECTOR DE CUENTA Y PERSISTENCIA) ---
+// --- PERFIL (LOGIN, ADMIN Y GESTIÓN DE PRODUCTOS) ---
 class ProfileScreen extends StatefulWidget {
   final GoogleSignInAccount? user;
   final bool isAdmin;
-  final VoidCallback onLogout; // 🔥 Cambio
+  final VoidCallback onLogout; 
   final Function(GoogleSignInAccount?, bool) onLogin;
   const ProfileScreen({super.key, this.user, required this.isAdmin, required this.onLogin, required this.onLogout});
 
@@ -359,7 +395,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(width: double.infinity, height: 50, child: OutlinedButton.icon(
             icon: const Icon(Icons.login), label: const Text('Continuar con Google'),
             onPressed: () async {
-              // 🔥 CAMBIO: Obliga a mostrar selector de cuenta
               await GoogleSignIn().signOut(); 
               final u = await GoogleSignIn().signIn();
               if (u != null) widget.onLogin(u, false);
@@ -381,6 +416,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Text('Nuevo Producto', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
           const SizedBox(height: 20),
           TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
+          const SizedBox(height: 15),
           TextField(controller: _priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Precio USD')),
           const SizedBox(height: 20),
           GestureDetector(
@@ -394,9 +430,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 30),
-          _isSaving ? const Center(child: CircularProgressIndicator()) : ElevatedButton(
-            onPressed: _addProduct, 
-            child: const Text('Subir a Cloudinary')
+          _isSaving ? const Center(child: CircularProgressIndicator()) : SizedBox(
+            width: double.infinity, height: 55,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+              onPressed: _addProduct, 
+              child: const Text('Subir a Cloudinary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+            ),
           ),
         ]),
       ),
@@ -434,8 +474,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.check_circle_outline, size: 80, color: Colors.green),
-            Text('Total: \$${widget.total.toStringAsFixed(2)}'),
+            const SizedBox(height: 20),
+            Text('Total: \$${widget.total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 40),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
               onPressed: () async {
                 setState(() => processing = true);
                 try {
@@ -443,11 +486,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       headers: {'Content-Type': 'application/json'},
                       body: json.encode({'email': widget.email, 'totalAmount': widget.total.toStringAsFixed(2)}));
                   cartNotifier.value = [];
-                  Navigator.pop(context);
-                } catch (e) {}
-                setState(() => processing = false);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Factura enviada al correo')));
+                  }
+                } catch (e) { debugPrint(e.toString()); }
+                if (mounted) setState(() => processing = false);
               }, 
-              child: const Text('Finalizar Pedido')
+              child: const Text('Finalizar Pedido', style: TextStyle(fontSize: 18))
             ),
           ],
         ),
