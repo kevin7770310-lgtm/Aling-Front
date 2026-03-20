@@ -1,45 +1,23 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# --- Mejoras adicionales ---
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# Secretos y configuraciones locales
+android/local.properties
+android/key.properties
+android/app/src/main/res/raw/google_services.json
+ios/Runner/GoogleService-Info.plist
+*.keystore
+*.jks
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
+# Carpetas de paquetes y dependencias temporales
+.packages
+.flutter-plugins
 .flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
 
-# Symbolication related
-app.*.symbols
+# Ignorar configuración de IDE personal
+.vscode/
+.idea/workspace.xml
 
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Logs y archivos temporales de sistema
+*.log
+Thumbs.db
+.DS_Store

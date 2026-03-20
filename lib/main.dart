@@ -5,17 +5,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:image_picker/image_picker.dart'; // 🚀 IMPORTANTE
-import 'dart:io'; // Para manejar archivos en móvil
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-// 🚀 IMPORTANTE: Importa tu nuevo archivo aquí
 import 'screens/address_screen.dart';
+import 'package:app_importaciones/services/push_notifications_service.dart';
 
 // --- ESTADO GLOBAL ---
-final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 final ValueNotifier<List<dynamic>> cartNotifier = ValueNotifier([]);
 final ValueNotifier<GoogleSignInAccount?> userNotifier = ValueNotifier(null);
-final ValueNotifier<bool> adminNotifier = ValueNotifier(false);
 
 final GoogleSignIn _googleSignIn = GoogleSignIn(
   clientId: kIsWeb
@@ -25,9 +25,65 @@ final GoogleSignIn _googleSignIn = GoogleSignIn(
   scopes: ['email', 'https://www.googleapis.com/auth/userinfo.profile'],
 );
 
+class PushNotificationsService {
+  static FirebaseMessaging messaging = FirebaseMessaging.instance;
+  static String? token;
+
+  static Future<void> initializeApp() async {
+    // 1. Solicitar permisos (Esencial para iOS y Android 13+)
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      debugPrint('🔔 Permisos de notificaciones concedidos');
+
+      // 2. Obtener el Token de Firebase (FCM Token)
+      // Este es el código que identifica este celular en tu base de datos
+      token = await messaging.getToken();
+
+      debugPrint('================ FCM TOKEN ================');
+      debugPrint(token ?? 'No se pudo obtener el token');
+      debugPrint('===========================================');
+
+      // TIP: Aquí es donde enviarías el token a tu backend de Node.js
+      // Ejemplo: _sendTokenToBackend(token);
+    } else {
+      debugPrint('🚫 Permisos de notificaciones denegados');
+    }
+
+    // 3. Configurar manejadores de mensajes
+    FirebaseMessaging.onMessage.listen(_onMessageHandler);
+    FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenApp);
+
+    // Manejador para cuando la app está en segundo plano/cerrada
+    FirebaseMessaging.onBackgroundMessage(_backgroundHandler);
+  }
+
+  // Se ejecuta cuando la app está abierta y llega un mensaje
+  static Future<void> _onMessageHandler(RemoteMessage message) async {
+    debugPrint('Mensaje en primer plano: ${message.notification?.title}');
+  }
+
+  // Se ejecuta cuando el usuario hace clic en la notificación
+  static Future<void> _onMessageOpenApp(RemoteMessage message) async {
+    debugPrint('App abierta desde notificación: ${message.notification?.body}');
+  }
+
+  // Manejador obligatorio para mensajes en segundo plano (debe ser estático)
+  static Future<void> _backgroundHandler(RemoteMessage message) async {
+    debugPrint('Mensaje en background: ${message.messageId}');
+  }
+}
+
 void main() async {
+  // 1. Asegurar que los canales de comunicación con el sistema nativo estén listos
   WidgetsFlutterBinding.ensureInitialized();
+
   try {
+    // 2. Inicializar Firebase según la plataforma
     if (kIsWeb) {
       await Firebase.initializeApp(
         options: const FirebaseOptions(
@@ -40,38 +96,43 @@ void main() async {
         ),
       );
     } else {
+      // En móvil, Firebase busca automáticamente el google-services.json
       await Firebase.initializeApp();
     }
+
+    // 3. Inicializar servicios dependientes
+    await PushNotificationsService.initializeApp();
   } catch (e) {
-    debugPrint("Error Firebase: $e");
+    // Registrar el error pero decidir si la app debe continuar
+    debugPrint("Error en inicialización: $e");
+    // Opcional: podrías mostrar una pantalla de error personalizada aquí
   }
+
   runApp(const AlingApp());
 }
-
-// ... (Clases AlingApp y MainScreen se mantienen igual que en tu mensaje) ...
 
 class AlingApp extends StatelessWidget {
   const AlingApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (_, mode, __) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorSchemeSeed: Colors.deepOrange,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            titleTextStyle: TextStyle(
-              color: Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.deepOrange,
+        scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.white,
+          titleTextStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
-        home: const MainScreen(),
       ),
+      home: const MainScreen(),
     );
   }
 }
@@ -79,11 +140,12 @@ class AlingApp extends StatelessWidget {
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<MainScreen> createState() => MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  void changeTab(int index) => setState(() => _selectedIndex = index);
 
   @override
   void initState() {
@@ -94,55 +156,70 @@ class _MainScreenState extends State<MainScreen> {
   _checkPersistedSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('isAdmin') == true) {
-        adminNotifier.value = true;
-        return;
-      }
       if (prefs.getString('userEmail') != null) {
         final user = await _googleSignIn.signInSilently();
         userNotifier.value = user;
       }
     } catch (e) {
-      debugPrint("Aviso de Google (Sesión persistida): $e");
+      debugPrint("Sesión: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      const HomeScreen(),
-      const CartScreen(),
-      const ProfileScreen(),
-    ];
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Tienda',
+    return ValueListenableBuilder<GoogleSignInAccount?>(
+      valueListenable: userNotifier,
+      builder: (context, user, _) {
+        final List<Widget> screens = [
+          const HomeScreen(),
+          const CartScreen(),
+          user == null ? const LoginRequiredScreen() : const MarketplacePanel(),
+          const ProfileScreen(),
+        ];
+
+        return Scaffold(
+          body: IndexedStack(index: _selectedIndex, children: screens),
+          bottomNavigationBar: Container(
+            decoration: const BoxDecoration(
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+            ),
+            child: NavigationBar(
+              elevation: 0,
+              backgroundColor: Colors.white,
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: changeTab,
+              indicatorColor: Colors.deepOrange.withOpacity(0.2),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.storefront_outlined),
+                  selectedIcon: Icon(Icons.storefront),
+                  label: 'Tienda',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.shopping_cart_outlined),
+                  selectedIcon: Icon(Icons.shopping_cart),
+                  label: 'Carrito',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.add_circle_outline),
+                  selectedIcon: Icon(Icons.add_circle),
+                  label: 'Vender',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Perfil',
+                ),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.shopping_cart_outlined),
-            selectedIcon: Icon(Icons.shopping_cart),
-            label: 'Carrito',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-// ... (HomeScreen y _ProductCard se mantienen igual) ...
-
+// --- TIENDA (HOME) CON CARRUSEL Y ESQUELETOS ---
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -150,8 +227,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List products = [];
+  List allProducts = [];
+  List filteredProducts = [];
+  final List<String> categories = [
+    'Todos',
+    'Víveres',
+    'Tecnología',
+    'Hogar',
+    'Moda',
+    'Otros',
+  ];
+  String selectedCategory = 'Todos';
   bool loading = true;
+  String? error;
 
   @override
   void initState() {
@@ -161,44 +249,202 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> load() async {
     if (!mounted) return;
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
       final res = await http
           .get(Uri.parse('https://aling-backend.onrender.com/api/products'))
-          .timeout(const Duration(seconds: 40));
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
-        if (mounted) setState(() => products = json.decode(res.body));
+        if (mounted) {
+          setState(() {
+            allProducts = json.decode(res.body);
+            _applyFilter();
+            loading = false;
+          });
+        }
+      } else {
+        throw "Server Error";
       }
     } catch (e) {
-      debugPrint(e.toString());
+      if (mounted)
+        setState(() {
+          error = "Conexión lenta con Aling. Reintenta.";
+          loading = false;
+        });
     }
-    if (mounted) setState(() => loading = false);
+  }
+
+  void _applyFilter() {
+    setState(() {
+      if (selectedCategory == 'Todos') {
+        filteredProducts = allProducts;
+      } else {
+        filteredProducts = allProducts.where((p) {
+          String pCat = (p['category'] ?? 'Otros')
+              .toString()
+              .trim()
+              .toLowerCase();
+          String sCat = selectedCategory.trim().toLowerCase();
+          return pCat == sCat;
+        }).toList();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Aling Mayorista')),
-      body: loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.deepOrange),
-            )
-          : RefreshIndicator(
-              onRefresh: load,
-              color: Colors.deepOrange,
-              child: GridView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.72,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                ),
-                itemCount: products.length,
-                itemBuilder: (ctx, i) => _ProductCard(product: products[i]),
-              ),
+      appBar: AppBar(
+        title: const Text('ALING MAYORISTA'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => showSearch(
+              context: context,
+              delegate: ProductSearchDelegate(allProducts),
             ),
+          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: load),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (selectedCategory == 'Todos' && !loading) _buildPromoCarousel(),
+          _buildCategoryChips(),
+          Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromoCarousel() {
+    return Container(
+      height: 130,
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      child: PageView(
+        children: [
+          _buildPromoItem(
+            "Ofertas Aling",
+            "Mayorista en Santo Domingo",
+            Colors.deepOrange,
+          ),
+          _buildPromoItem(
+            "Nuevos Ingresos",
+            "Tecnología y más",
+            Colors.black87,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromoItem(String t, String s, Color c) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: c,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(s, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return SizedBox(
+      height: 55,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        itemCount: categories.length,
+        itemBuilder: (ctx, i) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: ChoiceChip(
+            label: Text(categories[i]),
+            selected: selectedCategory == categories[i],
+            selectedColor: Colors.deepOrange,
+            labelStyle: TextStyle(
+              color: selectedCategory == categories[i]
+                  ? Colors.white
+                  : Colors.black,
+            ),
+            onSelected: (v) {
+              setState(() {
+                selectedCategory = categories[i];
+                _applyFilter();
+              });
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (loading) return _buildSkeletonGrid();
+    if (error != null)
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 50, color: Colors.grey),
+            Text(error!),
+            ElevatedButton(onPressed: load, child: const Text("Reintentar")),
+          ],
+        ),
+      );
+    if (filteredProducts.isEmpty)
+      return const Center(child: Text("No hay productos aquí."));
+
+    return RefreshIndicator(
+      onRefresh: load,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.72,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+        ),
+        itemCount: filteredProducts.length,
+        itemBuilder: (ctx, i) => _ProductCard(product: filteredProducts[i]),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.72,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+      ),
+      itemCount: 4,
+      itemBuilder: (ctx, i) => Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(15),
+        ),
+      ),
     );
   }
 }
@@ -206,187 +452,193 @@ class _HomeScreenState extends State<HomeScreen> {
 class _ProductCard extends StatelessWidget {
   final dynamic product;
   const _ProductCard({required this.product});
-
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: adminNotifier,
-      builder: (context, isAdmin, _) =>
-          ValueListenableBuilder<GoogleSignInAccount?>(
-            valueListenable: userNotifier,
-            builder: (context, user, _) {
-              final bool isLoggedIn = user != null || isAdmin;
-              return GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (c) => ProductDetailScreen(
-                      product: product,
-                      isLoggedIn: isLoggedIn,
-                    ),
-                  ),
-                ),
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  elevation: 3,
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Hero(
-                          tag: 'hero-${product['id']}',
-                          child: Image.network(
-                            product['imageUrl'] ?? '',
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.image, size: 50),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              product['name'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              '\$${product['factoryPrice']}',
-                              style: const TextStyle(
-                                color: Colors.deepOrange,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-    );
-  }
-}
-
-// ... (ProductDetailScreen, CartScreen y ProfileScreen se mantienen igual) ...
-
-class ProductDetailScreen extends StatelessWidget {
-  final dynamic product;
-  final bool isLoggedIn;
-  const ProductDetailScreen({
-    super.key,
-    required this.product,
-    required this.isLoggedIn,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Detalles del Producto')),
-      body: SingleChildScrollView(
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (c) => ProductDetailScreen(product: product),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5),
+          ],
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Hero(
-              tag: 'hero-${product['id']}',
-              child: Image.network(
-                product['imageUrl'] ?? '',
-                height: 300,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox(
-                  height: 300,
-                  child: Center(
-                    child: Icon(Icons.image, size: 80, color: Colors.grey),
-                  ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15),
+                ),
+                child: Image.network(
+                  product['imageUrl'] ?? '',
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.image),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product['name'] ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '\$${product['factoryPrice']}',
+                    style: const TextStyle(
+                      color: Colors.deepOrange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- DETALLE PRODUCTO ---
+class ProductDetailScreen extends StatelessWidget {
+  final dynamic product;
+  const ProductDetailScreen({super.key, required this.product});
+
+  // 🚀 Función de WhatsApp mejorada
+  void _whatsapp(BuildContext context) async {
+    // Usamos el teléfono del producto o el tuyo por defecto
+    String phone = product['sellerPhone'] ?? '593982822157';
+
+    // Limpiamos el número de espacios o caracteres extraños por si acaso
+    phone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+
+    String message =
+        "¡Hola! Estoy interesado en este producto de Aling Mayorista:\n\n"
+        "*Producto:* ${product['name']}\n"
+        "*Precio:* \$${product['factoryPrice']}\n\n"
+        "¿Está disponible?";
+
+    final url = "https://wa.me/$phone?text=${Uri.encodeComponent(message)}";
+
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } else {
+        throw "No se pudo abrir la URL";
+      }
+    } catch (e) {
+      // 🚀 Si falla, mostramos el aviso visual
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Hubo un problema al abrir WhatsApp. Verifica que esté instalado.",
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Detalle del Producto')),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Image.network(
+              product['imageUrl'] ?? '',
+              height: 350,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.image, size: 100),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     product['name'] ?? '',
                     style: const TextStyle(
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 10),
                   Text(
                     '\$${product['factoryPrice']}',
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 26,
                       color: Colors.deepOrange,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
+                  Chip(
+                    label: Text(product['category'] ?? 'Otros'),
+                    backgroundColor: Colors.orange.shade50,
+                  ),
+                  const Divider(height: 30),
                   const Text(
-                    'Descripción:',
+                    'Descripción',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 8),
                   Text(
-                    product['description'] ??
-                        'Este producto es distribuido por Aling Mayorista con los más altos estándares de calidad.',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black87,
-                      height: 1.5,
-                    ),
+                    product['description'] ?? 'Sin descripción.',
+                    style: const TextStyle(fontSize: 16),
                   ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isLoggedIn
-                            ? Colors.deepOrange
-                            : Colors.black,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () async {
-                        if (!isLoggedIn) {
-                          return;
-                        }
-                        cartNotifier.value = List.from(cartNotifier.value)
-                          ..add(product);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('✅ Agregado al carrito'),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        isLoggedIn
-                            ? 'Añadir al Carrito'
-                            : 'Inicia sesión para comprar',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 100),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+      bottomSheet: Container(
+        padding: const EdgeInsets.all(20),
+        color: Colors.white,
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepOrange,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                onPressed: () {
+                  cartNotifier.value = List.from(cartNotifier.value)
+                    ..add(product);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text(' Agregado al carrito')),
+                  );
+                },
+                child: const Text('AL CARRITO'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // 🚀 BOTÓN DE WHATSAPP
+            FloatingActionButton(
+              backgroundColor: const Color(0xFF25D366),
+              onPressed: () => _whatsapp(context), // Pasamos el context aquí
+              child: const Icon(Icons.chat, color: Colors.white),
             ),
           ],
         ),
@@ -395,373 +647,179 @@ class ProductDetailScreen extends StatelessWidget {
   }
 }
 
+// --- CARRITO ---
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: adminNotifier,
-      builder: (context, isAdmin, _) =>
-          ValueListenableBuilder<GoogleSignInAccount?>(
-            valueListenable: userNotifier,
-            builder: (context, user, _) {
-              final bool isLoggedIn = user != null || isAdmin;
-              if (!isLoggedIn) {
-                return Scaffold(
-                  appBar: AppBar(title: const Text('Mi Carrito')),
-                  body: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.remove_shopping_cart_outlined,
-                          size: 80,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 20),
-                        Text(
-                          'Tu carrito está bloqueado',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+    return ValueListenableBuilder<GoogleSignInAccount?>(
+      valueListenable: userNotifier,
+      builder: (context, user, _) {
+        if (user == null) return const LoginRequiredScreen();
+        return ValueListenableBuilder<List>(
+          valueListenable: cartNotifier,
+          builder: (ctx, list, _) {
+            double total = 0;
+            for (var item in list)
+              total += double.tryParse(item['factoryPrice'].toString()) ?? 0;
+            return Scaffold(
+              appBar: AppBar(title: const Text('Mi Carrito')),
+              body: list.isEmpty
+                  ? const Center(child: Text("Tu carrito está vacío"))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: list.length,
+                      itemBuilder: (ctx, i) => Card(
+                        child: ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              list[i]['imageUrl'],
+                              width: 50,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          title: Text(list[i]['name']),
+                          subtitle: Text('\$${list[i]['factoryPrice']}'),
+                          trailing: IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
+                            onPressed: () => cartNotifier.value = List.from(
+                              cartNotifier.value,
+                            )..removeAt(i),
                           ),
                         ),
-                        Text(
-                          'Debes iniciar sesión para comprar.',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              }
-              return ValueListenableBuilder<List>(
-                valueListenable: cartNotifier,
-                builder: (ctx, list, _) {
-                  double total = 0;
-                  for (var item in list) {
-                    var p = item['factoryPrice'];
-                    total += (p is String)
-                        ? (double.tryParse(p) ?? 0)
-                        : (p?.toDouble() ?? 0);
-                  }
-                  return Scaffold(
-                    appBar: AppBar(title: const Text('Mi Carrito')),
-                    body: list.isEmpty
-                        ? const Center(child: Text('Carrito vacío'))
-                        : Column(
-                            children: [
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: list.length,
-                                  itemBuilder: (ctx, i) => ListTile(
-                                    leading: Image.network(
-                                      list[i]['imageUrl'] ?? '',
-                                      width: 50,
-                                      height: 50,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          const Icon(Icons.image),
-                                    ),
-                                    title: Text(list[i]['name'] ?? ''),
-                                    trailing: Text(
-                                      '\$${list[i]['factoryPrice']}',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      'Total: \$${total.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        minimumSize: const Size(
-                                          double.infinity,
-                                          50,
-                                        ),
-                                        backgroundColor: Colors.deepOrange,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      onPressed: () {
-                                        String email = isAdmin
-                                            ? 'admin@aling.com'
-                                            : user!.email;
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (c) => AddressScreen(
-                                              total: total,
-                                              email: email,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: const Text('Proceder al Pago'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+              bottomNavigationBar: list.isEmpty
+                  ? null
+                  : Container(
+                      padding: const EdgeInsets.all(20),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 60),
+                          backgroundColor: Colors.deepOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
                           ),
-                  );
-                },
-              );
-            },
-          ),
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) =>
+                                AddressScreen(total: total, email: user.email),
+                          ),
+                        ),
+                        child: Text('PAGAR \$${total.toStringAsFixed(2)}'),
+                      ),
+                    ),
+            );
+          },
+        );
+      },
     );
   }
 }
 
+// --- PERFIL ---
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: adminNotifier,
-      builder: (context, isAdmin, _) =>
-          ValueListenableBuilder<GoogleSignInAccount?>(
-            valueListenable: userNotifier,
-            builder: (context, user, _) {
-              if (isAdmin) return const AdminPanel();
-              if (user != null) return _buildModernProfile(context, user);
-              return _buildLogin(context);
-            },
-          ),
-    );
-  }
-
-  Widget _buildModernProfile(BuildContext context, GoogleSignInAccount user) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mi Perfil'), elevation: 0),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.deepOrange.shade100,
-                    backgroundImage: user.photoUrl != null
-                        ? NetworkImage(user.photoUrl!)
-                        : null,
-                    child: user.photoUrl == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Colors.deepOrange,
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.displayName ?? 'Usuario',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          user.email,
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+    return ValueListenableBuilder<GoogleSignInAccount?>(
+      valueListenable: userNotifier,
+      builder: (context, user, _) {
+        if (user == null) return _buildLogin(context);
+        return Scaffold(
+          appBar: AppBar(title: const Text('Mi Cuenta')),
+          body: Column(
+            children: [
+              const SizedBox(height: 30),
+              CircleAvatar(
+                radius: 50,
+                backgroundImage: user.photoUrl != null
+                    ? NetworkImage(user.photoUrl!)
+                    : null,
               ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.shopping_bag_outlined),
-              title: const Text('Mis Pedidos'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: const Icon(Icons.location_on_outlined),
-              title: const Text('Mis Direcciones'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (c) =>
-                        AddressScreen(email: user.email, total: 0.0),
-                  ),
-                );
-              },
-            ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
+              const SizedBox(height: 15),
+              Text(
+                user.displayName ?? 'Kevin',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(user.email, style: const TextStyle(color: Colors.grey)),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.all(20),
                 child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
                   icon: const Icon(Icons.logout),
                   label: const Text('Cerrar Sesión'),
                   onPressed: () async {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.clear();
-                    try {
-                      await _googleSignIn.signOut();
-                    } catch (_) {}
+                    await _googleSignIn.signOut();
                     userNotifier.value = null;
-                    adminNotifier.value = false;
                   },
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildLogin(BuildContext context) {
-    final emailCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    final ValueNotifier<bool> obscureNotifier = ValueNotifier(true);
     return Scaffold(
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(35),
+        child: Padding(
+          padding: const EdgeInsets.all(30),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(
-                Icons.account_circle_outlined,
-                size: 80,
+                Icons.shopping_bag_outlined,
+                size: 100,
                 color: Colors.deepOrange,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
               const Text(
-                'Iniciar Sesión',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                "Bienvenido a Aling",
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 40),
-              TextField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Correo Admin',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 15),
-              ValueListenableBuilder<bool>(
-                valueListenable: obscureNotifier,
-                builder: (context, obscure, _) {
-                  return TextField(
-                    controller: passCtrl,
-                    obscureText: obscure,
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscure ? Icons.visibility_off : Icons.visibility,
-                          color: Colors.grey,
-                        ),
-                        onPressed: () =>
-                            obscureNotifier.value = !obscureNotifier.value,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 25),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
+              const SizedBox(height: 50),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.login),
+                label: const Text("CONTINUAR CON GOOGLE"),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 55),
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  onPressed: () async {
-                    if (emailCtrl.text.trim() == 'admin@aling.com' &&
-                        passCtrl.text.trim() == 'admin123') {
+                ),
+                onPressed: () async {
+                  try {
+                    final u = await _googleSignIn.signIn();
+                    if (u != null) {
                       final prefs = await SharedPreferences.getInstance();
-                      await prefs.setBool('isAdmin', true);
-                      adminNotifier.value = true;
-                      if (context.mounted) {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (context) => const MainScreen(),
-                          ),
-                          (route) => false,
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('✅ Sesión iniciada como Admin'),
-                          ),
-                        );
-                      }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('❌ Credenciales incorrectas'),
-                        ),
-                      );
+                      await prefs.setString('userEmail', u.email);
+                      userNotifier.value = u;
                     }
-                  },
-                  child: const Text('Entrar como Admin'),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('O'),
-              ),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.login),
-                  label: const Text('Continuar con Google'),
-                  onPressed: () async {
-                    try {
-                      await _googleSignIn.signOut();
-                      final u = await _googleSignIn.signIn();
-                      if (u != null) {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setString('userEmail', u.email);
-                        userNotifier.value = u;
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('✅ Bienvenido ${u.displayName}'),
-                            ),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('❌ Error al conectar con Google'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
+                  } catch (e) {
+                    debugPrint(e.toString());
+                  }
+                },
               ),
             ],
           ),
@@ -771,143 +829,170 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// --- PANEL ADMIN ---
-class AdminPanel extends StatelessWidget {
-  const AdminPanel({super.key});
+class LoginRequiredScreen extends StatelessWidget {
+  const LoginRequiredScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.account_circle_outlined,
+              size: 100,
+              color: Colors.deepOrange.shade100,
+            ),
+            const Text(
+              "Acceso Requerido",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                final mainState = context
+                    .findAncestorStateOfType<MainScreenState>();
+                mainState?.changeTab(3);
+              },
+              child: const Text("IR AL LOGIN"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- MARKETPLACE PANEL ---
+class MarketplacePanel extends StatelessWidget {
+  const MarketplacePanel({super.key});
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Panel Administrativo'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.clear();
-                adminNotifier.value = false;
-              },
-            ),
-          ],
+          title: const Text('Mi Negocio'),
           bottom: const TabBar(
             labelColor: Colors.deepOrange,
-            indicatorColor: Colors.deepOrange,
             tabs: [
-              Tab(icon: Icon(Icons.add_box), text: 'Subir Producto'),
-              Tab(icon: Icon(Icons.edit), text: 'Gestionar'),
+              Tab(text: 'Publicar'),
+              Tab(text: 'Mis Productos'),
             ],
           ),
         ),
-        body: const TabBarView(children: [AdminAddTab(), AdminManageTab()]),
+        body: const TabBarView(children: [VenderAddTab(), VenderManageTab()]),
       ),
     );
   }
 }
 
-// --- PESTAÑA: SUBIR PRODUCTO (CON IMAGEN DEL CELULAR) ---
-class AdminAddTab extends StatefulWidget {
-  const AdminAddTab({super.key});
+class VenderAddTab extends StatefulWidget {
+  const VenderAddTab({super.key});
   @override
-  State<AdminAddTab> createState() => _AdminAddTabState();
+  State<VenderAddTab> createState() => _VenderAddTabState();
 }
 
-class _AdminAddTabState extends State<AdminAddTab> {
+class _VenderAddTabState extends State<VenderAddTab> {
   final _nameCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-
-  XFile? _pickedImage; // 🚀 Almacena el archivo seleccionado
+  String _selectedCategory = 'Otros';
+  XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
   bool _isSaving = false;
 
-  // 🚀 Función para abrir galería/archivos
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80, // Comprime un poco para que suba más rápido a Render
-    );
-    if (image != null) {
-      setState(() => _pickedImage = image);
-    }
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) setState(() => _imageFile = image);
   }
 
   Future<void> _addProduct() async {
-    if (_nameCtrl.text.isEmpty ||
-        _priceCtrl.text.isEmpty ||
-        _pickedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Llena todos los campos y selecciona una imagen'),
-        ),
-      );
+    if (_nameCtrl.text.isEmpty || _priceCtrl.text.isEmpty || _imageFile == null)
       return;
-    }
-
     setState(() => _isSaving = true);
-
     try {
-      // 🚀 Usamos MultipartRequest para enviar el ARCHIVO real, no solo el link
-      var request = http.MultipartRequest(
+      var req = http.MultipartRequest(
         'POST',
         Uri.parse('https://aling-backend.onrender.com/api/products'),
       );
-
-      request.fields['name'] = _nameCtrl.text;
-      request.fields['factoryPrice'] = _priceCtrl.text;
-      request.fields['description'] = _descCtrl.text;
-
-      // Adjuntamos la imagen desde los archivos
+      req.fields['name'] = _nameCtrl.text;
+      req.fields['factoryPrice'] =
+          double.tryParse(_priceCtrl.text)?.toStringAsFixed(2) ?? "0.00";
+      req.fields['description'] = _descCtrl.text;
+      req.fields['category'] = _selectedCategory;
+      req.fields['sellerEmail'] = userNotifier.value?.email ?? '';
       if (kIsWeb) {
-        // Para Web usamos bytes
-        request.files.add(
+        req.files.add(
           http.MultipartFile.fromBytes(
             'image',
-            await _pickedImage!.readAsBytes(),
-            filename: _pickedImage!.name,
+            await _imageFile!.readAsBytes(),
+            filename: _imageFile!.name,
           ),
         );
       } else {
-        // Para Móvil usamos la ruta del archivo
-        request.files.add(
-          await http.MultipartFile.fromPath('image', _pickedImage!.path),
+        req.files.add(
+          await http.MultipartFile.fromPath('image', _imageFile!.path),
         );
       }
-
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 201) {
-        _nameCtrl.clear();
-        _priceCtrl.clear();
-        _descCtrl.clear();
-        setState(() => _pickedImage = null);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ ¡Producto e imagen subidos con éxito!'),
-            ),
-          );
-        }
-      }
+      await req.send();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Publicado correctamente')),
+      );
+      _nameCtrl.clear();
+      _priceCtrl.clear();
+      _descCtrl.clear();
+      setState(() => _imageFile = null);
     } catch (e) {
-      debugPrint("Error al subir producto: $e");
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+      debugPrint(e.toString());
     }
+    setState(() => _isSaving = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(25),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
+          GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+              ),
+              child: _imageFile == null
+                  ? const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_a_photo,
+                          size: 40,
+                          color: Colors.deepOrange,
+                        ),
+                        Text("Añadir Foto"),
+                      ],
+                    )
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: kIsWeb
+                          ? Image.network(_imageFile!.path, fit: BoxFit.cover)
+                          : Image.file(
+                              File(_imageFile!.path),
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
           TextField(
             controller: _nameCtrl,
             decoration: const InputDecoration(
-              labelText: 'Nombre del Producto',
+              labelText: 'Nombre',
               border: OutlineInputBorder(),
             ),
           ),
@@ -916,77 +1001,49 @@ class _AdminAddTabState extends State<AdminAddTab> {
             controller: _priceCtrl,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: 'Precio USD',
+              labelText: 'Precio \$',
               border: OutlineInputBorder(),
             ),
+          ),
+          const SizedBox(height: 15),
+          DropdownButtonFormField<String>(
+            value: _selectedCategory,
+            decoration: const InputDecoration(
+              labelText: 'Categoría',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              'Víveres',
+              'Tecnología',
+              'Hogar',
+              'Moda',
+              'Otros',
+            ].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+            onChanged: (val) => setState(() => _selectedCategory = val!),
           ),
           const SizedBox(height: 15),
           TextField(
             controller: _descCtrl,
             maxLines: 3,
             decoration: const InputDecoration(
-              labelText: 'Descripción detallada',
+              labelText: 'Descripción',
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 20),
-
-          // 🖼️ SECCIÓN DE SELECCIÓN DE IMAGEN (Reemplaza al TextField de tu captura)
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.deepOrange.withOpacity(0.5)),
-              ),
-              child: _pickedImage == null
-                  ? const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_photo_alternate_outlined,
-                          size: 50,
-                          color: Colors.deepOrange,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          "Toca para seleccionar imagen de la galería",
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: kIsWeb
-                          ? Image.network(_pickedImage!.path, fit: BoxFit.cover)
-                          : Image.file(
-                              File(_pickedImage!.path),
-                              fit: BoxFit.cover,
-                            ),
-                    ),
-            ),
-          ),
-
-          const SizedBox(height: 30),
+          const SizedBox(height: 25),
           _isSaving
-              ? const CircularProgressIndicator(color: Colors.deepOrange)
+              ? const CircularProgressIndicator()
               : ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 55),
                     backgroundColor: Colors.deepOrange,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(15),
                     ),
                   ),
                   onPressed: _addProduct,
-                  child: const Text(
-                    'SUBIR PRODUCTO',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  child: const Text('PUBLICAR PRODUCTO'),
                 ),
         ],
       ),
@@ -994,14 +1051,13 @@ class _AdminAddTabState extends State<AdminAddTab> {
   }
 }
 
-// --- PESTAÑA: GESTIONAR (ADMIN COMPLETO) ---
-class AdminManageTab extends StatefulWidget {
-  const AdminManageTab({super.key});
+class VenderManageTab extends StatefulWidget {
+  const VenderManageTab({super.key});
   @override
-  State<AdminManageTab> createState() => _AdminManageTabState();
+  State<VenderManageTab> createState() => _VenderManageTabState();
 }
 
-class _AdminManageTabState extends State<AdminManageTab> {
+class _VenderManageTabState extends State<VenderManageTab> {
   List products = [];
   bool loading = true;
 
@@ -1013,110 +1069,88 @@ class _AdminManageTabState extends State<AdminManageTab> {
 
   Future<void> load() async {
     if (!mounted) return;
-    setState(() => loading = true);
     try {
       final res = await http.get(
         Uri.parse('https://aling-backend.onrender.com/api/products'),
       );
       if (res.statusCode == 200) {
-        if (mounted) setState(() => products = json.decode(res.body));
+        List all = json.decode(res.body);
+        if (mounted)
+          setState(() {
+            products = all
+                .where((p) => p['sellerEmail'] == userNotifier.value?.email)
+                .toList();
+            loading = false;
+          });
       }
     } catch (e) {
-      debugPrint("Error al cargar: $e");
-    }
-    if (mounted) setState(() => loading = false);
-  }
-
-  Future<void> _deleteProduct(int id) async {
-    final confirm = await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar producto?'),
-        content: const Text(
-          'Esta acción borrará el producto de la base de datos de forma permanente.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('CANCELAR'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'ELIMINAR',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final res = await http.delete(
-          Uri.parse('https://aling-backend.onrender.com/api/products/$id'),
-        );
-        if (res.statusCode == 200) {
-          load();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Producto eliminado con éxito')),
-          );
-        }
-      } catch (e) {
-        debugPrint("Error delete: $e");
-      }
+      debugPrint(e.toString());
     }
   }
 
+  // 🚀 DIÁLOGO DE EDICIÓN CORREGIDO
   void _editProduct(dynamic p) {
     final nameCtrl = TextEditingController(text: p['name']);
     final priceCtrl = TextEditingController(text: p['factoryPrice'].toString());
     final descCtrl = TextEditingController(text: p['description'] ?? '');
+    String localCategory = p['category'] ?? 'Otros'; // Valor inicial
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar Información'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Precio USD'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        // IMPORTANTE: StatefulBuilder permite que el Dropdown cambie visualmente
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text("Editar Producto"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nombre'),
                 ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepOrange,
-              foregroundColor: Colors.white,
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Precio'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: localCategory,
+                  items: ['Víveres', 'Tecnología', 'Hogar', 'Moda', 'Otros']
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+                  onChanged: (val) => setDialogState(
+                    () => localCategory = val!,
+                  ), // Actualiza la variable local
+                  decoration: const InputDecoration(
+                    labelText: 'Categoría',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Descripción'),
+                ),
+              ],
             ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await http.put(
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancelar"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final res = await http.put(
                   Uri.parse(
                     'https://aling-backend.onrender.com/api/products/${p['id']}',
                   ),
@@ -1125,68 +1159,116 @@ class _AdminManageTabState extends State<AdminManageTab> {
                     'name': nameCtrl.text,
                     'factoryPrice': priceCtrl.text,
                     'description': descCtrl.text,
+                    'category': localCategory, // 🚀 AHORA SÍ SE ENVÍA EL CAMBIO
                   }),
                 );
-                load();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('✅ Cambios guardados')),
-                );
-              } catch (e) {
-                debugPrint("Error update: $e");
-              }
-            },
-            child: const Text('GUARDAR'),
-          ),
-        ],
+                if (res.statusCode == 200) {
+                  Navigator.pop(ctx);
+                  load();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("✅ Actualizado")),
+                  );
+                }
+              },
+              child: const Text("Guardar"),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading)
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.deepOrange),
-      );
-    return ListView.builder(
-      itemCount: products.length,
-      itemBuilder: (ctx, i) {
-        final p = products[i];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-          elevation: 2,
-          child: ListTile(
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                p['imageUrl'] ?? '',
-                width: 50,
-                height: 50,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.image),
+    if (loading) return const Center(child: CircularProgressIndicator());
+    return products.isEmpty
+        ? const Center(child: Text("Sin publicaciones"))
+        : ListView.builder(
+            padding: const EdgeInsets.all(10),
+            itemCount: products.length,
+            itemBuilder: (ctx, i) => Card(
+              child: ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: Image.network(
+                    products[i]['imageUrl'],
+                    width: 40,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                title: Text(products[i]['name']),
+                subtitle: Text(
+                  "\$${products[i]['factoryPrice']} • ${products[i]['category'] ?? 'Otros'}",
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () => _editProduct(products[i]),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () async {
+                        final res = await http.delete(
+                          Uri.parse(
+                            'https://aling-backend.onrender.com/api/products/${products[i]['id']}',
+                          ),
+                        );
+
+                        // Solo recargamos la lista si la eliminación fue exitosa
+                        if (res.statusCode == 200) {
+                          load();
+                        } else {
+                          // Opcional: mostrar un aviso si algo salió mal
+                          print("Error al borrar: ${res.statusCode}");
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-            title: Text(
-              p['name'],
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text('\$${p['factoryPrice']}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () => _editProduct(p),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _deleteProduct(p['id']),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+          );
+  }
+}
+
+class ProductSearchDelegate extends SearchDelegate {
+  final List<dynamic> products;
+  ProductSearchDelegate(this.products);
+  @override
+  String get searchFieldLabel => "Buscar en Aling...";
+  @override
+  List<Widget>? buildActions(BuildContext context) => [
+    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+  ];
+  @override
+  Widget? buildLeading(BuildContext context) => IconButton(
+    icon: const Icon(Icons.arrow_back),
+    onPressed: () => close(context, null),
+  );
+  @override
+  Widget buildResults(BuildContext context) => _buildList();
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildList();
+  Widget _buildList() {
+    final results = products
+        .where(
+          (p) =>
+              p['name'].toString().toLowerCase().contains(query.toLowerCase()),
+        )
+        .toList();
+    if (results.isEmpty) return const Center(child: Text("Sin resultados"));
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.72,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+      ),
+      itemCount: results.length,
+      itemBuilder: (ctx, i) => _ProductCard(product: results[i]),
     );
   }
 }
