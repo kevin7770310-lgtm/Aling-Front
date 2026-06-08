@@ -1,6 +1,6 @@
 {
-    "name": "app_importaciones",
-    "short_name": "app_importaciones",
+    "name": "NovaMarket",
+    "short_name": "NovaMarket",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

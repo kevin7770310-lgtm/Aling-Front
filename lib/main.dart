@@ -116,6 +116,7 @@ class AlingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Novamarket', //editar luego, quitar o poner Aling
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
