@@ -299,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ALING MAYORISTA'),
+        title: const Text('NOVAMARKET'),//temporañ, luego dejar de nuevo como ALING
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -328,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: PageView(
         children: [
           _buildPromoItem(
-            "Ofertas Aling",
+            "Ofertas Novamarket",//temporal, luego dejar como Aling
             "Mayorista en Santo Domingo",
             Colors.deepOrange,
           ),
@@ -1238,7 +1238,7 @@ class ProductSearchDelegate extends SearchDelegate {
   final List<dynamic> products;
   ProductSearchDelegate(this.products);
   @override
-  String get searchFieldLabel => "Buscar en Aling...";
+  String get searchFieldLabel => "Buscar en NovaMarket...";//temporal el nombre
   @override
   List<Widget>? buildActions(BuildContext context) => [
     IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
