@@ -1,0 +1,23 @@
+# --- Mejoras adicionales ---
+
+# Secretos y configuraciones locales
+android/local.properties
+android/key.properties
+android/app/src/main/res/raw/google_services.json
+ios/Runner/GoogleService-Info.plist
+*.keystore
+*.jks
+
+# Carpetas de paquetes y dependencias temporales
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Ignorar configuración de IDE personal
+.vscode/
+.idea/workspace.xml
+
+# Logs y archivos temporales de sistema
+*.log
+Thumbs.db
+.DS_Store

@@ -1,0 +1,40 @@
+name: app_importaciones
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  image_picker: ^1.0.7
+  firebase_core: ^4.5.0
+  google_sign_in: ^6.1.6
+  shared_preferences: ^2.5.4
+  url_launcher: ^6.3.2
+  firebase_messaging: ^16.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# 🔥 CONFIGURACIÓN DE LOS ICONOS DE LA APP 🔥
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icono_aling.png"
+  adaptive_icon_background: "#FF5722"
+  adaptive_icon_foreground: "assets/icono_aling.png"
+
+flutter:
+  uses-material-design: true
+
+  # 🔥 SE DECLARA LA CARPETA ASSETS PARA QUE FLUTTER LA LEA 🔥
+  assets:
+    - assets/

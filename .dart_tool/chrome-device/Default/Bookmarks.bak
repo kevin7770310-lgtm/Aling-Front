@@ -1,0 +1,161 @@
+{
+   "checksum": "044c70ca2dad315ed017b23d92b2d939",
+   "roots": {
+      "bookmark_bar": {
+         "children": [ {
+            "date_added": "13292623726546645",
+            "date_last_used": "13420849565666946",
+            "guid": "9d587f61-da70-4cec-9f50-a6042cedffc2",
+            "id": "7",
+            "name": "YouTube",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.youtube.com/",
+            "visit_count": 13
+         }, {
+            "date_added": "13292623749070337",
+            "date_last_used": "0",
+            "guid": "fd114c06-5d7d-4ef8-9873-c323ce64423c",
+            "id": "8",
+            "name": "Inicio - Roblox",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://web.roblox.com/home",
+            "visit_count": 0
+         }, {
+            "date_added": "13294859211374832",
+            "date_last_used": "0",
+            "guid": "b7459c35-ce3f-4a1d-8223-861e020492be",
+            "id": "9",
+            "name": "Netflix",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.netflix.com/ec/Login",
+            "visit_count": 0
+         }, {
+            "date_added": "13390707993496427",
+            "date_last_used": "13423842231466867",
+            "guid": "d442e915-183c-4973-ab81-0d7e65fdb873",
+            "id": "10",
+            "name": "Aula Virtual",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://aulavirtualmoodle.uleam.edu.ec/my/",
+            "visit_count": 64
+         }, {
+            "date_added": "13394318155047588",
+            "date_last_used": "13404507947120494",
+            "guid": "9ab781fb-15d9-4ec9-aa47-0cebede06ff0",
+            "id": "11",
+            "name": "¡Bienvenido a Rosetta Stone®!",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://login.rosettastone.com/login",
+            "visit_count": 17
+         }, {
+            "date_added": "13390331491428254",
+            "date_last_used": "0",
+            "guid": "61752b68-8fd3-41ff-bad6-f78c04c3c83e",
+            "id": "12",
+            "name": "Entrar al sitio | Aula virtual - Uleam",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://aulavirtualmoodle.uleam.edu.ec/login/index.php",
+            "visit_count": 0
+         }, {
+            "date_added": "13346689990798272",
+            "date_last_used": "0",
+            "guid": "4f72f100-094e-4656-a8a8-a06fd9be4e63",
+            "id": "13",
+            "name": "Adobe Acrobat",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://acrobat.adobe.com/?x_api_client_id=bookmark&x_api_client_location=Reader",
+            "visit_count": 0
+         }, {
+            "date_added": "13405611749255049",
+            "date_last_used": "0",
+            "guid": "ac80c797-f4e4-4d8e-bff2-2c8d5a9fa79d",
+            "id": "14",
+            "name": "Nueva pestaña",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://uleam-my.sharepoint.com/my",
+            "visit_count": 0
+         }, {
+            "date_added": "13411876136836594",
+            "date_last_used": "0",
+            "guid": "f5356c89-0f02-4518-8ab2-b874026e0116",
+            "id": "15",
+            "name": "De texto a voz | ElevenLabs",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://elevenlabs.io/app/speech-synthesis/text-to-speech",
+            "visit_count": 0
+         }, {
+            "date_added": "13425438230410912",
+            "date_last_used": "0",
+            "guid": "18059720-a68a-4907-92ae-14a26f1a4a38",
+            "id": "16",
+            "name": "Paletas de color Rojo [códigos + combinaciones]",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://paletadecolores.online/rojo/",
+            "visit_count": 1
+         } ],
+         "date_added": "13425612362272082",
+         "date_last_used": "0",
+         "date_modified": "13425438230410912",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Barra de favoritos",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "other": {
+         "children": [  ],
+         "date_added": "13425612362272082",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Otros favoritos",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [  ],
+         "date_added": "13425612362272082",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Favoritos móviles",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "workspaces_v2": {
+         "children": [  ],
+         "date_added": "13425612362272082",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "75aa6670-344f-549d-b742-660f029506ab",
+         "id": "5",
+         "name": "Áreas de trabajo",
+         "source": "unknown",
+         "type": "folder"
+      }
+   },
+   "sync_metadata": "CjEKDgiIgQISCN+mw6meAQAAEgAqGEdPTUwvVnlYeDdyNjVYYTFGM21HN1E9PUgDoAYHEo4BCAMSiQEKHG5qZ0R1ODhlQ3J2WHA4NnBEN2ZIR2NxRnA4OD0SJGY3ZWNlZDc3LTI3NDctNTc3Yi1hZTAwLTFkOWIzMmVmZGFiMBgAIAAoADD7muHL3TI4/57hy90yQP+e4cvdMkoceXpOQjAxY241NEE3Y1JVMHVUKy9QZ21UdFVvPVoAZQAAAADCPgJgABKuAQgQEqkBChwxMk00U2pzUjBPckpsMWNTR2ViMCt4R3NsMjQ9EiQxODA1OTcyMC1hNjhhLTQ5MDctOTJhZS0xNGEyNmYxYTRhMzgYACAAKAAw3s2OzuozOPL7js7qM0Dy+47O6jNKHG5KSEV5VXpGMUlSQWc2N29UK3VMSjRGY3dSTT1aICIe/+5vOFRsdDNpaVZManIrdmJOL2pXSVhGTjhhbWc9ZWWnOizCPgJgBRKuAQgPEqkBChxiZ2hEeGRpTmhUa2pLZkljaFBuWk05OUdxdnM9EiRmNTM1NmM4OS0wZjAyLTQ1MTgtOGFiMi1iODc0MDI2ZTAxMTYYACAAKAAwr5q7jMAzOPXBu4zAM0D1wbuMwDNKHEdFQjhuZUpHbVRXSmdFMENGUFl4ODVjVExnMD1aICIe/9x2OHJvWFFZSmsybnVsOWphU0lUQUNTYW5xbWs9ZdO5yQDCPgJgBRKOAQgCEokBChxZY1NUb252RVNQd3FDczRMMmNyVmh2NjhMOTg9EiQ3ODQ0NTA0OS0yOTQzLTU0NDQtYjQ1MC1lM2Q3NzcyYzYzOTIYACAAKAAw9prhy90yOMSe4cvdMkDEnuHL3TJKHG9QVmtod0JSYlY2NUtDV1IyK0lPTkhXb091OD1aAGUAAAAAwj4CYAASrQEIChKoAQocRzZEQnBWMlkvWG80eVBTVUVONGZSa0hJM0t3PRIkZDQ0MmU5MTUtMTgzYy00OTczLWFiODEtMGQ3ZTY1ZmRiODczGAAgACgAMKrFitXkMzi/t7id6TJAv7e4nekyShw4RVp2K0ZMNUFXZnFlblJjN1AwRjlxQkRVZDA9Wh8iHfVTYkc4Yld5OUdlbTMvOVVGOUdnSkh0dnZiKzQ9ZW5olLTCPgJgBRKtAQgNEqgBChxBdVhxWnFUUnk3L21FeWVjcnZ5VjR1WmJHczg9EiQ0ZjcyZjEwMC0wOTRlLTQ2NTYtYThhOC1hMDZmZDliZTRlNjMYACAAKAAwrZq7jMAzOKvAu4zAM0CrwLuMwDNKHGxyMmtaUllwWFJUL0doQU9jSDRoYmFzZ3Q5bz1aHyId/3BSZjdwSXRkS2lTQWZ0Q09RUzFZWUg0Q2NqUT1lAAAAAMI+AmAFEq0BCAkSqAEKHHpad2FtNzBRTFpMaVRJSnB2VWpWZ3J4YnFtUT0SJGI3NDU5YzM1LWNlM2YtNGExZC04MjIzLTg2MWUwMjA0OTJiZRgAIAAoADCvwpqplTM45dKS+90yQOXSkvvdMkocTUZNMGNNZGlPMm1UeTdEN0tBb2lXUkhuWDNVPVofIh3WOGp6V2QvSG9CVVQrZTQ0elVKMmp3eXk0VThJPWV82oQ5wj4CYAUSrgEIDhKpAQocbWVDTkVjRXFxQWFiMlN0RGIyTDVXTDVDbitJPRIkYWM4MGM3OTctZjRlNC00ZDhlLWJmZjItMmM4ZDVhOWZhNzlkGAAgACgAMK6au4zAMziNwbuMwDNAjcG7jMAzShxZUDB6WjRocURvM3B6bThEUnkydHJUWXcybGM9WiAiHv+4M2tPVGZqc0FmOFFwL0FrcXRHcWhTTElCRE5ZPWWjxIspwj4CYAUSrQEICBKoAQocc3A1aGROY0tkcUQ3L3pGSW1JYXJzc2J6cUE4PRIkZmQxMTRjMDYtNWQ3ZC00ZWY4LTk4NzMtYzMyM2NlNjQ0MjNjGAAgACgAMLDCmqmVMzjS0pL73TJA0tKS+90yShxVU0w1SUFSRlBsNGo3bERZVVFMQ0htZUxac0k9Wh8iHaxEYWllWGg1QzdkV1NDbnBCckZheVZINk54MWs9ZWOwZvLCPgJgBRKOAQgFEokBChx3UkJyWkwrNlBBOWF2S2dqTlA3SlhETGNmdnM9EiRkYTRkZGI1Yi1iYmRhLTU4MGUtYmI1Ni0wZGJkNDU1YmJhZTkYACAAKAAwlKWq3aQzOICmqt2kM0CApqrdpDNKHG5teDY1c1FEdnhJOFRnRWV2K0ErbnR0b1NuND1aAGUAAAAAwj4CYAASrAEIBxKnAQocc2p5QzJiK3Z6Rk9YZHBqNDNsYnI0QkZkQlJRPRIkOWQ1ODdmNjEtZGE3MC00Y2VjLTlmNTAtYTYwNDJjZWRmZmMyGAAgACgAMO3bm8TZMzj40pL73TJA+NKS+90yShxRN01kV3R3OFk0Wm0vampHVTk5MWR2LzdCYjQ9Wh4iHFhpQWV0Y29ZYkpEVHE2UXE3MitkbGRkenhFOD1lUELD0sI+AmAFEo4BCAESiQEKHHl4Si82ZnZrZWNyN2twNUVRekI0dFdMcGRiRT0SJDI2MGRmMjlhLTcxNjYtNWNjZi05OTUzLWU2ZTQ3OGZjNmJiMxgAIAAoADD1muHL3TI4qJ7hy90yQKie4cvdMkocYVJDV0xnaEY5YjVJbnFLSUR2dUovanZRa0ZjPVoAZQAAAADCPgJgABKtAQgMEqgBChxjZWxlM09BcW5ORTI3RVNOdFFpeDZoVG96WkE9EiQ2MTc1MmI2OC04ZmQzLTQxZmYtYmFkNi1mNzhjMDRjM2M4M2UYACAAKAAwrJq7jMAzOMO/u4zAM0DDv7uMwDNKHFk1ZEFuYVkrSDhaTkFxL0poc2F3QnlXOWw0dz1aHyId/mgzVTl2VU95S0M5dEo1aEFYb21tQUFiZzA3Zz1lbmiUtMI+AmAFEq0BCAsSqAEKHGVWMytFeUlPY2RUUjJvNEpNTlZyQ3lZTmlKZz0SJDlhYjc4MWZiLTE1ZDktNGVjOS1hYTQ3LTBjZWJlZGUwNmZmMBgAIAAoADDOxePRnDM42qjy1vYyQNqo8tb2MkocWEZHcUlVME9CR0tJNUtrRUFlci84WTkzSWU0PVofIh39NTZ2QkdHVUlnVE1ublZnT1g0QVVESkpabWtBPWXQdWvfwj4CYAUwADgA",
+   "version": 1
+}
