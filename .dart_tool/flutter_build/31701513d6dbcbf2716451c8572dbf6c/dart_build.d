@@ -1,1 +1,0 @@
- C:\\Users\\LENOVO\\Desktop\\TRABAJOS\ MILO\ ULEAM777\\ProyectoIndie\\Aling-Front-main\\.dart_tool\\flutter_build\\31701513d6dbcbf2716451c8572dbf6c\\dart_build_result.json: 
