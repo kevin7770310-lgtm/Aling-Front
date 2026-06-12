@@ -219,7 +219,7 @@ body: LayoutBuilder(
               children: const [
                 Text('NovaMarket', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                 SizedBox(height: 6),
-                Text('Mayorista en Santo Domingo', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                Text('Mayorista en Riobamba', style: TextStyle(color: Colors.white54, fontSize: 12)),
               ],
             ),
           ),

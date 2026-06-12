@@ -63,7 +63,7 @@ class ProfileScreen extends StatelessWidget {
             children: [
               const Icon(Icons.shopping_bag_outlined, size: 100, color: Colors.deepOrange),
               const SizedBox(height: 30),
-              const Text("Bienvenido a Aling",
+              const Text("Bienvenido a NovaMarket",
                 style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
               const SizedBox(height: 50),
               ElevatedButton.icon(
