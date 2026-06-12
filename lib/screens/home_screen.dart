@@ -112,7 +112,7 @@ body: LayoutBuilder(
       margin: const EdgeInsets.only(bottom: 10),
       child: PageView(
         children: [
-          _buildPromoItem("Ofertas NovaMarket", "Mayorista en Santo Domingo", const Color(0xFFD10000)),
+          _buildPromoItem("Ofertas NovaMarket", "Mayorista en Riobamba", const Color(0xFFD10000)),
           _buildPromoItem("Nuevos Ingresos", "Tecnología y más", Colors.black87),
         ],
       ),
