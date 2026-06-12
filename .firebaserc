@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "aling-app"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

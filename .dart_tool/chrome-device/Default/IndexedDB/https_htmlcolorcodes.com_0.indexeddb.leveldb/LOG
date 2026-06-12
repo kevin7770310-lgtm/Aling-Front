@@ -1,0 +1,6 @@
+2026/06/10-21:18:15.493 49a4 Creating DB C:\Users\LENOVO\AppData\Local\Temp\flutter_tools.9496acab\flutter_tools_chrome_device.a20847ca\Default\IndexedDB\https_htmlcolorcodes.com_0.indexeddb.leveldb since it was missing.
+2026/06/10-21:18:15.504 49a4 Reusing MANIFEST C:\Users\LENOVO\AppData\Local\Temp\flutter_tools.9496acab\flutter_tools_chrome_device.a20847ca\Default\IndexedDB\https_htmlcolorcodes.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/06/10-21:18:21.728 185c Level-0 table #5: started
+2026/06/10-21:18:21.730 185c Level-0 table #5: 367 bytes OK
+2026/06/10-21:18:21.732 185c Delete type=0 #3
+2026/06/10-21:18:21.733 185c Manual compaction at level-0 from (begin) .. (end); will stop at (end)
